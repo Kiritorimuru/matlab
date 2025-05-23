@@ -1,76 +1,53 @@
-% main.m
+%% ä¸»ç¨‹åº main
 clear all;
-clc;
+clear all;
+%% ç¦»çº¿æŒ‡çº¹æ•°æ®--------------------
+load("RSS.mat", "RSS");
+load("LOC.mat", "LOC");
+load("testrss.mat", "testrss");
+load("testloc.mat", "testloc");
 
-% ========== Ìí¼ÓÂ·¾¶ ==========
-addpath(genpath('C:\Users\30291\Desktop\Pytorch-Gan-based-dataset-expansion-main/merged_data')); % ºÏ²¢Êı¾İÂ·¾¶
-addpath(genpath('functions'));                % Ëã·¨º¯ÊıÂ·¾¶
+RSS = RSS;
+LOC = LOC;
 
-% ========== ¼ÓÔØÊı¾İ ==========
-building = 0;   % Ä¿±êÂ¥¶°
-floor = 3;      % Ä¿±êÂ¥²ã
+rss = testrss(1, :);
+loc = testloc(1, :);
 
-% 1. ¼ÓÔØºÏ²¢ºóµÄÑµÁ·Êı¾İ
-merged_train_file = sprintf('merged_building_%d_floor_%d.mat', building, floor);
-load(merged_train_file, 'RSS', 'LOC');
-fprintf('ÒÑ¼ÓÔØÑµÁ·Êı¾İ£º%s\n', merged_train_file);
+%% k-PCA è¿›è¡Œè®­ç»ƒæ ·æœ¬-------------------
+d = 3; % å¯ä»¥åˆ†åˆ«ä¿®æ”¹ %é…ç½®æ‰©å±•åçš„æ ·æœ¬æ¬¡æ•°
+type = 'gaussian'; % é€‰ç”¨é«˜æ–¯æ ¸å‡½æ•° poly simple gaussian
+para = 2; % å¯ä»¥åœ¨åè¾¹è¿›è¡Œä¿®æ”¹ è¿›è¡Œä»¿çœŸæ—¶ç”¨åˆ°
+[Y, eigVector, eigValue] = kPCA(RSS, d, type, para);
 
-% 2. ¼ÓÔØºÏ²¢ºóµÄ²âÊÔÊı¾İ£¨ĞèÌáÇ°´¦Àí£©
-merged_test_file = sprintf('merged_test_building_%d_floor_%d.mat', building, floor);
-load(merged_test_file, 'RSS_test', 'LOC_test');
-fprintf('ÒÑ¼ÓÔØ²âÊÔÊı¾İ£º%s\n', merged_test_file);
+FP = [LOC Y];
+FP1 = [LOC RSS];
+%% è®¡ç®—åœ¨çº¿çš„æ ·æœ¬ ----------
+[y, b] = kpca_online(rss, RSS, d, type, para); % æ•°æ®å‡ºç°é”™è¯¯ å› ä¸ºæ•°æ®çš„ç›¸è¿‘æ€§ åœ¨åšå·®çš„æ—¶å€™ä¸èƒ½å¾ˆå¥½çš„å»é™¤å¹¶ä¸èƒ½å¾ˆå¥½çš„è§£å†³ï¼Œ
+% end
 
-% Ëæ»úÑ¡Ôñ²âÊÔÑù±¾
-sample_idx = randi(size(RSS_test, 1));
-rss = RSS_test(sample_idx, :);
-loc = LOC_test(sample_idx, :);
-
-% ========== Êı¾İÔ¤´¦ÀíÑéÖ¤ ==========
-% ¼ì²éÊÇ·ñ´æÔÚÎ´´¦ÀíµÄ100Öµ
-if any(RSS(:) == 100) || any(RSS_test(:) == 100)
-    error('´æÔÚÎ´´¦ÀíµÄ100Öµ£¡');
-end
-
-% ¼ì²éÎ¬¶ÈÒ»ÖÂĞÔ
-assert(size(RSS, 2) == size(rss, 2), 'ÌØÕ÷Î¬¶È²»Æ¥Åä£¡');
-
-% ========== ºËPCA´¦Àí ==========
-d = min(3, size(RSS, 2)); % ¶¯Ì¬ÉèÖÃ½µÎ¬Î¬¶È
-type = 'gaussian';
-para = 2;
-[Y, ~, ~] = kPCA(RSS, d, type, para);
-
-% ¹¹½¨Ö¸ÎÆ¿â
-FP = [LOC, Y];
-FP1 = [LOC, RSS]; % Ô­Ê¼ÌØÕ÷Ö¸ÎÆ¿â
-
-% ========== ÔÚÏß¶¨Î»´¦Àí ==========
-[y, ~] = kpca_online(rss, RSS, d, type, para);
-
-% ========== ¶¨Î»Ëã·¨ ==========
+%% è¿›è¡Œå®šä½æ”¹è¿›KPCA_IWKNNè¿›è¡Œå®šä½
 a = 0.3;
-[~, p] = IWKNN(y, FP, a);      % ¸Ä½øWKNN£¨ºËPCA£©
-[~, p1] = IWKNN(rss, FP1, a);  % ¸Ä½øWKNN£¨Ô­Ê¼ÌØÕ÷£©
-[~, p2] = knn1(rss, FP1, 3);   % KNN
-[~, p3] = KNN(rss, FP1, 3);    % WKNN
+[L, p] = IWKNN(y, FP, a);
+%% ----æœªåŠ ç‰¹å¾æå–çš„ IWKNN
+[L1, p1] = IWKNN(rss, FP1, a);
+%% ------å•çº¯çš„KNN
+[L2, p2] = knn1(rss, FP1, 3);
+%% -----æœªåŠ ç‰¹å¾æå–çš„WKNN
+[L3, p3] = KNN(rss, FP1, 3);
+%% -----pcaç‰¹å¾æå–åçš„å®šä½---æ‰€æœ‰ç®—æ³•å·²ç»å˜å®Œã€‚ä¸”ç”¨åˆ°çš„æ˜¯æ”¹è¿›çš„KNNç®—æ³•
+[Y1, eigVector1, eigValue1] = PCA_sammid(RSS, 4);
+FP2 = [LOC Y1];
+rss1 = PCA_sammid_online(rss, RSS, 4); % rssä¸ºåœ¨çº¿æ ·æœ¬ï¼›
+%% ------ä»…ä»…é€šè¿‡PCAå PCA-wknnæœªç»è¿‡å®šä½æ”¹è¿›çš„
+[L4, p4] = KNN(rss1, FP2, 7);
 
-% ========== PCA¶Ô±È ==========
-[Y1, ~, ~] = PCA_sammid(RSS, 4);
-FP2 = [LOC, Y1];
-rss1 = PCA_sammid_online(rss, RSS, 4);
-[~, p4] = KNN(rss1, FP2, 7);   % PCA-WKNN
-
-% ========== Îó²î¼ÆËã ==========
-d = sqrt(sum((p - loc).^2));   % ºËPCA-IWKNN
-d1 = sqrt(sum((p1 - loc).^2)); % Ô­Ê¼IWKNN
-d2 = sqrt(sum((p2 - loc).^2)); % KNN
-d3 = sqrt(sum((p3 - loc).^2)); % WKNN
-d4 = sqrt(sum((p4 - loc).^2)); % PCA-WKNN
-
-D = [d, d1, d2, d3, d4];
-disp('¶¨Î»Îó²î£¨Ã×£©:');
-disp(D);
-
+%% --------è¯¯å·®ä¼°è®¡----
+d = sqrt(distance(p, loc));
+d1 = sqrt(distance(p1, loc));
+d2 = sqrt(distance(p2, loc));
+d3 = sqrt(distance(p3, loc));
+d4 = sqrt(distance(p4, loc));
+D = [d d1 d2 d3 d4];
 
 
 
